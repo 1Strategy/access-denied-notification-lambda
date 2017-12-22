@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: An AWS Serverless Specification template describing your function.
+Parameters:
+  SNSEmail:
+    Type: String
+    Default: justin.iravani@1strategy.com
+    Description: The email where SNS notifications will be sent
+
+  CloudTrailBucket:
+    Type: String
+    Description: S3 Bucket where the cloudtrail logs are being sent.
+
+Resources:
+  AccessDeniedSNSTopic:
+    Type: "AWS::SNS::Topic"
+    Properties:
+      DisplayName: AccessDenied
+      Subscription:
+        -
+          Endpoint:
+            Ref: SNSEmail
+          Protocol: "email"
+      TopicName: AccessDeniedTopic
+
+  DeniedNotification:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: denied_notification.lambda_handler
+      Runtime: python2.7
+      CodeUri: .
+      Description: ''
+      MemorySize: 128
+      Timeout: 60
+      Policies:
+        -
+          PolicyName: "AccessDeniedPermissions"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "logs:*"
+                  - "s3:GetObject"
+                Resource: "*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "sns:Publish"
+                Resource: "*"
+
+      Environment:
+        Variables:
+          sns_arn: !Ref AccessDeniedSNSTopic
+
+    LambdaInvokePermission:
+      Type: 'AWS::Lambda::Permission'
+      Properties:
+        FunctionName: !GetAtt
+          - DeniedNotification
+          - Arn
+        Action: 'lambda:InvokeFunction'
+        Principal: s3.amazonaws.com
+        SourceAccount: !Ref 'AWS::AccountId'
+        SourceArn: '*'
+
+    # AccessDeniedRole:
+    #   Type: AWS::IAM::Role
+    #   Properties:
+    #     RoleName: AccessDeniedRole
+    #     AssumeRolePolicyDocument:
+    #       Version: 2012-10-17
+    #       Statement:
+    #         - Effect: Allow
+    #           Principal:
+    #              Service:
+    #                - "lambda.amazonaws.com"
+    #           Action:
+    #             - sts:AssumeRole
+    #     Path: /
+    #     ManagedPolicyArns:
+    #       - arn:aws:iam::aws:policy/ReadOnlyAccess
+    #     Policies:
+    #       -
+    #         PolicyName: "AccessDeniedPermissions"
+    #         PolicyDocument:
+    #           Version: "2012-10-17"
+    #           Statement:
+    #             -
+    #               Effect: "Allow"
+    #               Action:
+    #                 - "s3:GetObject"
+    #               Resource: "*"
+    #             -
+    #               Effect: "Allow"
+    #               Action:
+    #                 - "sns:Publish"
+    #               Resource: "*"
