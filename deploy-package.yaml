@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: An AWS Serverless Specification template describing your function.
+Parameters:
+  CloudTrailBucket:
+    Description: S3 Bucket where the cloudtrail logs are being sent.
+    Type: String
+  SNSEmail:
+    Default: justin.iravani@1strategy.com
+    Description: The email where SNS notifications will be sent
+    Type: String
+Resources:
+  AccessDeniedSNSTopic:
+    Properties:
+      DisplayName: AccessDenied
+      Subscription:
+      - Endpoint:
+          Ref: SNSEmail
+        Protocol: email
+      TopicName: AccessDeniedTopic
+    Type: AWS::SNS::Topic
+  DeniedNotification:
+    LambdaInvokePermission:
+      Properties:
+        Action: lambda:InvokeFunction
+        FunctionName:
+          Fn::GetAtt:
+          - DeniedNotification
+          - Arn
+        Principal: s3.amazonaws.com
+        SourceAccount:
+          Ref: AWS::AccountId
+        SourceArn: '*'
+      Type: AWS::Lambda::Permission
+    Properties:
+      CodeUri: s3://1a-test-001/83ae448f7106363ff517468fbf263611
+      Description: ''
+      Environment:
+        Variables:
+          sns_arn:
+            Ref: AccessDeniedSNSTopic
+      Handler: denied_notification.lambda_handler
+      MemorySize: 128
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - logs:*
+            - s3:GetObject
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - sns:Publish
+            Effect: Allow
+            Resource: '*'
+          Version: '2012-10-17'
+        PolicyName: AccessDeniedPermissions
+      Runtime: python2.7
+      Timeout: 60
+    Type: AWS::Serverless::Function
+Transform: AWS::Serverless-2016-10-31
